@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 inkwellkit = { path = "../../", features = ["llvm12-0"] }
+libc = "0.2.*"
 
 [workspace]

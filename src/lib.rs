@@ -102,11 +102,11 @@ impl<'ctx> VMMod<'ctx> {
         builder
     }
 
-    pub fn append_main(&self, module: &Module<'ctx>) -> BasicBlock<'ctx> {
+    pub fn append_main(&self) -> BasicBlock<'ctx> {
         load_vm_common_ty!(get_ctx());
 
         let fn_main_t = i64_t.fn_type(&[], false);
-        let fn_main = module.add_function("main", fn_main_t, None);
+        let fn_main = self.module.add_function("main", fn_main_t, None);
 
         get_ctx().append_basic_block(fn_main, "blk_main")
     }
@@ -269,12 +269,11 @@ impl<'ctx> VMMod<'ctx> {
     pub fn build_call_printf(
         &self,
         builder: &Builder<'ctx>,
-        module: &Module<'ctx>,
         fcs: &str,
         values: &[BasicMetadataValueEnum<'ctx>],
     ) {
         let (fcs_p, _) = self.build_local_str(builder, fcs);
-        let fn_printf = module.get_function("printf").unwrap();
+        let fn_printf = self.module.get_function("printf").unwrap();
 
         let mut args = vec![fcs_p.into()];
         args.extend_from_slice(values);
@@ -340,6 +339,15 @@ pub fn builder_position_at_start<'ctx>(
         None => builder.position_at_end(entry),
     }
 }
+
+#[macro_export]
+macro_rules! ret_as_bv {
+    ($ret: expr) => {{
+        let ret = $ret;
+        ret.try_as_basic_value().left().unwrap()
+    }};
+}
+
 
 #[cfg(test)]
 mod tests {
