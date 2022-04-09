@@ -2,15 +2,14 @@ use either::Either;
 pub use inkwell::*;
 
 use inkwell::{
-    module::{ Module, Linkage },
-    context::{ Context, ContextRef }, basic_block::BasicBlock, builder::Builder, values::{PointerValue, IntValue, BasicMetadataValueEnum}
+    basic_block::BasicBlock,
+    builder::Builder,
+    context::{Context, ContextRef},
+    module::{Linkage, Module},
+    values::{BasicMetadataValueEnum, IntValue, PointerValue},
 };
 
-pub use proc_macros::{
-    impl_fn_hdr,
-    load_vm_common_ty
-};
-
+pub use proc_macros::{impl_fn_hdr, load_vm_common_ty};
 
 thread_local! {
     pub static CTX: ContextRef<'static> = ContextRef::new2();
@@ -32,11 +31,8 @@ impl<'ctx> VMMod<'ctx> {
     pub fn new(name: &str) -> Self {
         let module = get_ctx().create_module(name);
 
-        Self {
-            module
-        }
+        Self { module }
     }
-
 
     ///////////////////////////////////
     //// POSIX
@@ -75,16 +71,13 @@ impl<'ctx> VMMod<'ctx> {
         ];
     }
 
-
     ///////////////////////////////////
     //// POSIX
     pub fn get_builder() -> Builder<'ctx> {
         get_ctx().create_builder()
     }
 
-    pub fn get_builder_at_end(
-        blk: BasicBlock<'ctx>,
-    ) -> Builder<'ctx> {
+    pub fn get_builder_at_end(blk: BasicBlock<'ctx>) -> Builder<'ctx> {
         let builder = Self::get_builder();
 
         builder.position_at_end(blk);
@@ -92,9 +85,7 @@ impl<'ctx> VMMod<'ctx> {
         builder
     }
 
-    pub fn get_builder_at_start(
-        blk: BasicBlock<'ctx>,
-    ) -> Builder<'ctx> {
+    pub fn get_builder_at_start(blk: BasicBlock<'ctx>) -> Builder<'ctx> {
         let builder = Self::get_builder();
 
         builder_position_at_start(&builder, blk);
@@ -111,24 +102,15 @@ impl<'ctx> VMMod<'ctx> {
         get_ctx().append_basic_block(fn_main, "blk_main")
     }
 
-
     //////////////////////////////////////////////////////////////////////
     //// Convenient Build
     //////////////////////////////////////////////////////////////////////
 
-    pub fn bload_int(
-        &self,
-        builder: &Builder<'ctx>,
-        var: PointerValue<'ctx>,
-    ) -> IntValue<'ctx> {
+    pub fn bload_int(&self, builder: &Builder<'ctx>, var: PointerValue<'ctx>) -> IntValue<'ctx> {
         builder.build_load(var, "").into_int_value()
     }
 
-    pub fn bcnt_init(
-        &self,
-        builder: &Builder<'ctx>,
-        init: IntValue<'ctx>,
-    ) -> PointerValue<'ctx> {
+    pub fn bcnt_init(&self, builder: &Builder<'ctx>, init: IntValue<'ctx>) -> PointerValue<'ctx> {
         load_vm_common_ty!(get_ctx());
 
         let var = builder.build_alloca(i32_t, "");
@@ -141,9 +123,8 @@ impl<'ctx> VMMod<'ctx> {
         &self,
         builder: &Builder<'ctx>,
         var: PointerValue<'ctx>,
-        step: IntValue<'ctx>
-    )
-    {
+        step: IntValue<'ctx>,
+    ) {
         let val = self.bload_int(builder, var);
         let nxt = builder.build_int_add(val, step, "");
         builder.build_store(var, nxt);
@@ -154,18 +135,13 @@ impl<'ctx> VMMod<'ctx> {
         &self,
         builder: &Builder<'ctx>,
         var: PointerValue<'ctx>,
-        test: Either<IntValue<'ctx>, IntValue<'ctx>>
-    ) -> IntValue<'ctx>
-    {
+        test: Either<IntValue<'ctx>, IntValue<'ctx>>,
+    ) -> IntValue<'ctx> {
         let val = self.bload_int(builder, var);
 
         match test {
-            Either::Left(low) => {
-                self.bsgt(builder, val, low)
-            },
-            Either::Right(high) => {
-                self.bsgt(builder, high, val)
-            },
+            Either::Left(low) => self.bsgt(builder, val, low),
+            Either::Right(high) => self.bsgt(builder, high, val),
         }
     }
 
@@ -196,13 +172,10 @@ impl<'ctx> VMMod<'ctx> {
     ) -> (PointerValue<'ctx>, IntValue<'ctx>) {
         load_vm_common_ty!(get_ctx());
 
-        let var= i8_t.const_array(values);
+        let var = i8_t.const_array(values);
         let len = self.usize((values.len() as u64).try_into().unwrap());
 
-        let var_ptr = builder.build_alloca(
-            var.get_type(),
-            ""
-        );
+        let var_ptr = builder.build_alloca(var.get_type(), "");
         builder.build_store(var_ptr, var);
 
         let var_ptr_cast = builder
@@ -220,13 +193,10 @@ impl<'ctx> VMMod<'ctx> {
     ) -> (PointerValue<'ctx>, IntValue<'ctx>) {
         load_vm_common_ty!(get_ctx());
 
-        let var= size_t.const_array(values);
+        let var = size_t.const_array(values);
         let len = self.usize((values.len() as u64).try_into().unwrap());
 
-        let var_ptr = builder.build_alloca(
-            var.get_type(),
-            ""
-        );
+        let var_ptr = builder.build_alloca(var.get_type(), "");
         builder.build_store(var_ptr, var);
 
         let var_ptr_cast = builder
@@ -246,16 +216,10 @@ impl<'ctx> VMMod<'ctx> {
 
         let len = self.usize((values.len() as u64).try_into().unwrap());
 
-        let var_ptr = builder.build_array_alloca(
-            size_t,
-            len,
-            ""
-        );
+        let var_ptr = builder.build_array_alloca(size_t, len, "");
         for (i, value) in values.into_iter().enumerate() {
             let idx = self.usize(i);
-            let ptr = unsafe {
-                builder.build_in_bounds_gep(var_ptr, &[idx], "")
-            };
+            let ptr = unsafe { builder.build_in_bounds_gep(var_ptr, &[idx], "") };
             builder.build_store::<IntValue>(ptr, (*value).into());
         }
 
@@ -281,7 +245,6 @@ impl<'ctx> VMMod<'ctx> {
         builder.build_call(fn_printf, &args[..], "");
     }
 
-
     //////////////////////////////////////////////////////////////////////
     //// Convenient Const
     //////////////////////////////////////////////////////////////////////
@@ -306,7 +269,6 @@ impl<'ctx> VMMod<'ctx> {
         size_t.const_int(value as u64, false)
     }
 
-
     //////////////////////////////////////////////////////////////////////
     //// Convenient Cmp
     //////////////////////////////////////////////////////////////////////
@@ -330,10 +292,7 @@ impl<'ctx> VMMod<'ctx> {
     }
 }
 
-pub fn builder_position_at_start<'ctx>(
-    builder: &Builder<'ctx>,
-    entry: BasicBlock<'ctx>,
-) {
+pub fn builder_position_at_start<'ctx>(builder: &Builder<'ctx>, entry: BasicBlock<'ctx>) {
     match entry.get_first_instruction() {
         Some(first_instr) => builder.position_before(&first_instr),
         None => builder.position_at_end(entry),
@@ -348,8 +307,5 @@ macro_rules! ret_as_bv {
     }};
 }
 
-
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
