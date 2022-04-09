@@ -1,0 +1,26 @@
+[package]
+name = "inkwellkit"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm12-0"] }
+inkwell = { path = "../m6inkwell" }
+either = "1.6.*"
+proc_macros = { path = "./proc_macros" }
+
+[workspace]
+members = [
+    "proc_macros",
+]
+
+[features]
+default = ["llvm12-0"]
+llvm8-0 = ["inkwell/llvm8-0"]
+llvm9-0 = ["inkwell/llvm9-0"]
+llvm10-0 = ["inkwell/llvm10-0"]
+llvm11-0 = ["inkwell/llvm11-0"]
+llvm12-0 = ["inkwell/llvm12-0"]
+llvm13-0 = ["inkwell/llvm13-0"]
