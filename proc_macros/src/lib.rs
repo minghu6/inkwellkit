@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream as TokenStream2, Span};
 use quote::quote;
 use syn::parenthesized;
 use syn::parse::{Parse, ParseStream, Result};
@@ -99,13 +99,21 @@ impl Parse for VMPriTy {
             "i32" | "u32" => quote! {
                 i32_t
             },
+            "i64" | "u64" => quote! {
+                i64_t
+            },
             "i128" => quote! {
                 i128_t
             },
             "void" => quote! {
                 void_t
             },
-            _ => panic!("Unsupported vm type name {}", ty.to_string()),
+            other => {
+                let other = Ident::new(&format!("{}_t", other), Span::call_site());
+                quote! {
+                    #other
+                }
+            },
         };
         for _ in 0..ptrlv {
             ty_ts.extend(quote! {

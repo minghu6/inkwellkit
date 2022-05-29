@@ -1,3 +1,7 @@
+#![feature(box_syntax)]
+
+pub mod config;
+
 use either::Either;
 pub use inkwell::*;
 
@@ -6,7 +10,7 @@ use inkwell::{
     builder::Builder,
     context::{Context, ContextRef},
     module::{Linkage, Module},
-    values::{BasicMetadataValueEnum, IntValue, PointerValue},
+    values::{BasicMetadataValueEnum, IntValue, PointerValue, FunctionValue, BasicValueEnum},
 };
 
 pub use proc_macros::{impl_fn_hdr, load_vm_common_ty};
@@ -22,6 +26,8 @@ pub fn get_ctx<'ctx>() -> &'ctx Context {
     CTX.with(|ctx| unsafe { ctx.get() })
 }
 
+// pub type IncludeClosure<'ctx> = Box<dyn FnOnce(&Module<'ctx>) + 'ctx>;
+
 pub struct VMMod<'ctx> {
     pub module: Module<'ctx>,
 }
@@ -31,7 +37,9 @@ impl<'ctx> VMMod<'ctx> {
     pub fn new(name: &str) -> Self {
         let module = get_ctx().create_module(name);
 
-        Self { module }
+        Self {
+            module,
+        }
     }
 
     ///////////////////////////////////
@@ -72,7 +80,14 @@ impl<'ctx> VMMod<'ctx> {
     }
 
     ///////////////////////////////////
-    //// POSIX
+    //// Get Function
+    pub fn get_unchecked_fn(&self, name: &str) -> FunctionValue<'ctx> {
+        self.module.get_function(name).unwrap()
+    }
+
+    ///////////////////////////////////
+    //// Builder
+
     pub fn get_builder() -> Builder<'ctx> {
         get_ctx().create_builder()
     }
@@ -249,7 +264,10 @@ impl<'ctx> VMMod<'ctx> {
     //// Convenient Const
     //////////////////////////////////////////////////////////////////////
 
-    // i8_t
+    pub fn null() -> BasicValueEnum<'ctx> {
+        get_ctx().i8_type().const_int(0, false).into()
+    }
+
     pub fn u8(&self, value: u8) -> IntValue<'ctx> {
         load_vm_common_ty!(get_ctx());
 

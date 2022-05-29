@@ -1,13 +1,19 @@
 #![feature(exit_status_error)]
 
-use std::{error::Error, path::Path, process::{Command, Stdio}};
-
-use inkwellkit::{
-    VMMod,
-    get_ctx, load_vm_common_ty, ret_as_bv,
-    AddressSpace, OptimizationLevel, module::Module, targets::{InitializationConfig, Target, TargetMachine, CodeModel, RelocMode, FileType}
+use std::{
+    error::Error,
+    path::Path,
+    process::{Command, Stdio},
 };
 
+use inkwellkit::{
+    get_ctx, impl_fn_hdr, load_vm_common_ty,
+    module::{Linkage, Module},
+    ret_as_bv,
+    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
+    AddressSpace, OptimizationLevel, VMMod,
+    // types::{ RetTypeEnum }
+};
 
 fn action() -> Result<(), Box<dyn Error>> {
     let module_name = "posix_llvm2";
@@ -35,29 +41,81 @@ fn action() -> Result<(), Box<dyn Error>> {
     );
     let mode = i32_t.const_int(0o6666, false);
 
-    let fd = ret_as_bv!(builder.build_call(
-        fn_open,
-        &[fns.into(), flags.into(), mode.into()],
-        ""
-    ));
+    let fd = ret_as_bv!(builder.build_call(fn_open, &[fns.into(), flags.into(), mode.into()], ""));
 
     // write to it
     let fn_write = vmmod.module.get_function("write").unwrap();
-    let (content, content_len) =
-        vmmod.build_local_str(&builder, "_____写入了");
+    let (content, content_len) = vmmod.build_local_str(&builder, "_____写入了");
     let write_ok = ret_as_bv!(builder.build_call(
         fn_write,
         &[fd.into(), content.into(), content_len.into()],
         "",
     ));
 
-    vmmod.build_call_printf(
-        &builder,
-        "write res: %d\n",
-        &[write_ok.into()],
-    );
+    vmmod.build_call_printf(&builder, "write res: %d\n", &[write_ok.into()]);
 
     let fn_main = vmmod.module.get_function("main").unwrap();
+
+    let struct_vec_t = get_ctx().opaque_struct_type("dynvec");
+    let vec_t = struct_vec_t.ptr_type(AddressSpace::Generic);
+    // let vec_t = struct_vec_t;
+
+
+    let module = &vmmod.module;
+
+    impl_fn_hdr![module|
+        vec_new_i32(i32) -> vec;
+        vec_push_i32(vec, i32) -> i32;
+        vec_get_i32(vec, i32) -> i32;
+    ];
+
+    // let fn_vec_new_i32_t = vec_t.fn_type(&[i32_t.into()], false);
+
+    // let fn_vec_push_i32_t = i32_t.fn_type(&[vec_t.into(), i32_t.into()], false);
+
+    // let fn_vec_get_i32_t = i32_t.fn_type(&[vec_t.into(), i32_t.into()], false);
+
+    // let fn_vec_new_i32 =
+    //     vmmod
+    //         .module
+    //         .add_function("vec_new_i32", fn_vec_new_i32_t, None);
+    // let fn_vec_push_i32 =
+    //     vmmod
+    //         .module
+    //         .add_function("vec_push_i32", fn_vec_push_i32_t, None);
+    // let fn_vec_get_i32 =
+    //     vmmod
+    //         .module
+    //         .add_function("vec_get_i32", fn_vec_get_i32_t, None);
+
+    let v = ret_as_bv!(builder.build_call(
+        vmmod.get_unchecked_fn("vec_new_i32"),
+        &[vmmod.i32(20).into()],
+        ""
+    ));
+    builder.build_call(
+        vmmod.get_unchecked_fn("vec_push_i32"),
+        &[v.into(), vmmod.i32(1).into()],
+        "",
+    );
+    builder.build_call(
+        vmmod.get_unchecked_fn("vec_push_i32"),
+        &[v.into(), vmmod.i32(4).into()],
+        "",
+    );
+    builder.build_call(
+        vmmod.get_unchecked_fn("vec_push_i32"),
+        &[v.into(), vmmod.i32(9).into()],
+        "",
+    );
+
+    let get_0 = ret_as_bv!(builder.build_call(
+        vmmod.get_unchecked_fn("vec_get_i32"),
+        &[v.into(), vmmod.i32(0).into()],
+        ""
+    ));
+
+    vmmod.build_call_printf(&builder, "get0: %d\n", &[get_0.into()]);
 
     // // TEST IF ELSE
     // // compare int res > 5
@@ -85,7 +143,6 @@ fn action() -> Result<(), Box<dyn Error>> {
 
     // close it
 
-
     // end main
     builder.build_return(Some(&i64_t.const_zero()));
     fn_main.verify(true);
@@ -93,15 +150,11 @@ fn action() -> Result<(), Box<dyn Error>> {
     print_obj(&vmmod.module, OptimizationLevel::None)?;
     println!("->: {}", module_name);
     let bin_output = module_name.to_owned() + ".out";
-    link(&bin_output, &["./output.o"])?;
+    link(&bin_output, &["./output.o", "libbas.a"])?;
     run_bin(&bin_output)
 }
 
-
-fn print_obj<'ctx>(
-    module: &Module<'ctx>,
-    optlv: OptimizationLevel,
-) -> Result<(), Box<dyn Error>> {
+fn print_obj<'ctx>(module: &Module<'ctx>, optlv: OptimizationLevel) -> Result<(), Box<dyn Error>> {
     Target::initialize_native(&InitializationConfig::default())?;
 
     let triple = TargetMachine::get_default_triple();
@@ -124,17 +177,9 @@ fn print_obj<'ctx>(
 
     module.print_to_stderr();
 
-    machine.write_to_file(
-        &module,
-        FileType::Assembly,
-        Path::new("./output.asm"),
-    )?;
+    machine.write_to_file(&module, FileType::Assembly, Path::new("./output.asm"))?;
 
-    machine.write_to_file(
-        &module,
-        FileType::Object,
-        Path::new("./output.o"),
-    )?;
+    machine.write_to_file(&module, FileType::Object, Path::new("./output.o"))?;
 
     Ok(())
 }
@@ -142,16 +187,16 @@ fn print_obj<'ctx>(
 #[inline]
 pub fn link(output: &str, input_list: &[&str]) -> Result<(), Box<dyn Error>> {
     Command::new("gcc")
-    .args(input_list)
-    // cargo rustc -- --print native-static-libs
-    .args("-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc".split(" "))
-    .arg("-o")
-    .arg(output)
-    .stdin(Stdio::null())
-    .stdout(Stdio::inherit())
-    .spawn()?
-    .wait()?
-    .exit_ok()?;
+        .args(input_list)
+        // cargo rustc -- --print native-static-libs
+        .args("-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc".split(" "))
+        .arg("-o")
+        .arg(output)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .spawn()?
+        .wait()?
+        .exit_ok()?;
 
     Ok(())
 }
@@ -165,7 +210,6 @@ pub fn run_bin(output: &str) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     action()
