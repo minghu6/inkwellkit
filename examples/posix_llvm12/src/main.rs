@@ -19,9 +19,9 @@ fn action() -> Result<(), Box<dyn Error>> {
     let module_name = "posix_llvm2";
     let vmmod = VMMod::new(module_name);
 
-    vmmod.include_stdio();
-    vmmod.include_unistd();
-    vmmod.include_fcntl();
+    VMMod::include_stdio(&vmmod.module);
+    VMMod::include_unistd(&vmmod.module);
+    VMMod::include_fcntl(&vmmod.module);
 
     let builder = VMMod::get_builder();
     load_vm_common_ty!(get_ctx());
@@ -144,7 +144,7 @@ fn action() -> Result<(), Box<dyn Error>> {
     // close it
 
     // end main
-    builder.build_return(Some(&i64_t.const_zero()));
+    builder.build_return(Some(i64_t.const_zero()));
     fn_main.verify(true);
 
     print_obj(&vmmod.module, OptimizationLevel::None)?;

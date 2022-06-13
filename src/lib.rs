@@ -10,7 +10,7 @@ use inkwell::{
     builder::Builder,
     context::{Context, ContextRef},
     module::{Linkage, Module},
-    values::{BasicMetadataValueEnum, IntValue, PointerValue, FunctionValue, BasicValueEnum},
+    values::{BasicMetadataValueEnum, IntValue, PointerValue, FunctionValue, BasicValueEnum, FloatValue, VectorValue},
 };
 
 pub use proc_macros::{impl_fn_hdr, load_vm_common_ty};
@@ -45,33 +45,25 @@ impl<'ctx> VMMod<'ctx> {
     ///////////////////////////////////
     //// POSIX
 
-    pub fn include_fcntl(&self) {
-        let module = &self.module;
-
+    pub fn include_fcntl(module: &Module<'ctx>) {
         impl_fn_hdr![ module |
             open(*i8, i32, ...) -> i32;
         ];
     }
 
-    pub fn include_stdio(&self) {
-        let module = &self.module;
-
+    pub fn include_stdio(module: &Module<'ctx>) {
         impl_fn_hdr![ module |
             printf(*i8, ...) -> i32;
         ];
     }
 
-    pub fn include_string(&self) {
-        let module = &self.module;
-
+    pub fn include_string(module: &Module<'ctx>) {
         impl_fn_hdr![ module |
             strlen(*i8) -> usize;
         ];
     }
 
-    pub fn include_unistd(&self) {
-        let module = &self.module;
-
+    pub fn include_unistd(module: &Module<'ctx>) {
         impl_fn_hdr![ module |
             write(i32, *i8, usize) -> i128;
             close(i32) -> i32;
@@ -274,6 +266,15 @@ impl<'ctx> VMMod<'ctx> {
         i8_t.const_int(value as u64, false)
     }
 
+    pub fn bool(&self, value: bool) -> IntValue<'ctx> {
+        if value {
+            self.u8(1)
+        }
+        else {
+            self.u8(0)
+        }
+    }
+
     pub fn i32(&self, value: i32) -> IntValue<'ctx> {
         load_vm_common_ty!(get_ctx());
 
@@ -285,6 +286,17 @@ impl<'ctx> VMMod<'ctx> {
         load_vm_common_ty!(get_ctx());
 
         size_t.const_int(value as u64, false)
+    }
+
+    pub fn f64(&self, value: f64) -> FloatValue<'ctx> {
+        load_vm_common_ty!(get_ctx());
+
+        f64_t.const_float(value)
+    }
+
+    /// c raw char*
+    pub fn str(&self, value: &str) -> VectorValue<'ctx> {
+        get_ctx().const_string(value.as_bytes(), true)
     }
 
     //////////////////////////////////////////////////////////////////////
