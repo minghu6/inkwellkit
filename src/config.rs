@@ -38,8 +38,9 @@ impl ArgEnum for OptLv {
 }
 
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub enum TargetType {
+    #[default]
     Bin,
     ReLoc,
     DyLib,
@@ -64,10 +65,11 @@ impl ArgEnum for TargetType {
 }
 
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub enum EmitType {
     LLVMIR,
     Asm,
+    #[default]
     Obj,
 }
 
