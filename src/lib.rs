@@ -1,5 +1,3 @@
-#![feature(box_syntax)]
-
 pub mod config;
 
 use either::Either;
